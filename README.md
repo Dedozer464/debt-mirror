@@ -1,62 +1,580 @@
-import { useState, useEffect, useRef } from "react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine
-} from "recharts";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debt Mirror · South Africa</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+    :root {
+      --blue:       #1565C0;
+      --blue-light: #1976D2;
+      --blue-pale:  #e3f0ff;
+      --blue-card:  #f4f8ff;
+      --blue-border:#90CAF9;
+      --blue-grid:  #BBDEFB;
+      --red:        #D32F2F;
+      --red-pale:   #fff5f5;
+      --ink:        #1a1a2e;
+      --white:      #ffffff;
+      --serif:      'DM Serif Display', Georgia, serif;
+      --mono:       'DM Mono', monospace;
+    }
 
-const fmt = (v) =>
-  "R" + Number(v).toLocaleString("en-ZA", { maximumFractionDigits: 0 });
+    body {
+      background: var(--white);
+      color: var(--ink);
+      font-family: var(--serif);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
 
-const calcMonthlyRate = (principal, payment, months) => {
+    /* ── HEADER ── */
+    .header {
+      border-bottom: 2px solid var(--blue);
+      padding: 28px 24px 24px;
+      background: linear-gradient(180deg, var(--blue-pale) 0%, var(--white) 100%);
+    }
+    .logo {
+      font-size: 11px;
+      letter-spacing: .3em;
+      color: var(--blue);
+      text-transform: uppercase;
+      font-family: var(--mono);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .header h1 {
+      font-size: clamp(26px, 5vw, 40px);
+      font-weight: 700;
+      line-height: 1.15;
+      color: var(--blue);
+    }
+    .header p {
+      margin-top: 8px;
+      font-size: 14px;
+      color: var(--blue-light);
+      font-family: var(--mono);
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    /* ── LAYOUT ── */
+    .body-wrap { padding: 24px 16px 0; max-width: 600px; margin: 0 auto; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--blue-card);
+      border: 1.5px solid var(--blue-border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      margin-bottom: 16px;
+    }
+    .exit-card {
+      background: linear-gradient(135deg, #e3f2fd 0%, var(--blue-card) 100%);
+      border: 1.5px solid var(--blue);
+      border-radius: 12px;
+      padding: 28px 24px;
+      margin-bottom: 16px;
+    }
+
+    /* ── LABELS ── */
+    .field-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: .2em;
+      color: var(--blue);
+      text-transform: uppercase;
+      font-family: var(--mono);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .section-label {
+      font-size: 10px;
+      letter-spacing: .3em;
+      color: var(--blue);
+      text-transform: uppercase;
+      font-family: var(--mono);
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    /* ── INPUTS ── */
+    .field { margin-bottom: 24px; }
+    input[type=number] {
+      width: 100%;
+      background: var(--white);
+      border: 1.5px solid var(--blue-border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: var(--ink);
+      font-size: 20px;
+      font-family: var(--mono);
+      font-weight: 700;
+      outline: none;
+      transition: border-color .2s;
+      -moz-appearance: textfield;
+    }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type=number]:focus { border-color: var(--blue); }
+
+    hr.divider {
+      border: none;
+      border-top: 1.5px solid var(--blue-border);
+      margin: 20px 0;
+    }
+
+    /* ── BUTTONS ── */
+    .btn-primary {
+      width: 100%;
+      background: var(--blue);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      padding: 18px;
+      font-size: 16px;
+      font-family: var(--serif);
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .05em;
+      margin-top: 8px;
+      transition: background .2s, transform .1s;
+    }
+    .btn-primary:hover { background: #0d47a1; }
+    .btn-primary:active { transform: scale(.98); }
+
+    .btn-back {
+      background: transparent;
+      border: 1.5px solid var(--blue);
+      border-radius: 8px;
+      color: var(--blue);
+      padding: 10px 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 20px;
+      letter-spacing: .1em;
+      transition: background .2s;
+    }
+    .btn-back:hover { background: var(--blue-pale); }
+
+    .btn-reset {
+      width: 100%;
+      background: var(--white);
+      color: var(--blue);
+      border: 1.5px solid var(--blue);
+      border-radius: 8px;
+      padding: 18px;
+      font-size: 16px;
+      font-family: var(--serif);
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .05em;
+      margin-top: 24px;
+      transition: background .2s;
+    }
+    .btn-reset:hover { background: var(--blue-pale); }
+
+    /* ── ERROR ── */
+    .error-box {
+      background: var(--red-pale);
+      border: 1.5px solid var(--red);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: var(--red);
+      font-size: 13px;
+      font-family: var(--mono);
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── DISCLAIMER ── */
+    .disclaimer {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--red);
+      font-family: var(--mono);
+      font-weight: 700;
+      letter-spacing: .05em;
+      line-height: 1.6;
+    }
+    .disclaimer-box {
+      margin-top: 24px;
+      padding: 14px 16px;
+      background: var(--red-pale);
+      border: 2px solid var(--red);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .disclaimer-box p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--red);
+      font-family: var(--mono);
+      font-weight: 700;
+      letter-spacing: .04em;
+      line-height: 1.7;
+    }
+
+    /* ── RESULT NUMBERS ── */
+    .big-num {
+      font-size: clamp(34px, 8vw, 58px);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -.02em;
+    }
+    .num-blue  { color: var(--blue); }
+    .num-red   { color: var(--red); }
+    .num-green { color: #2a9d8f; }
+
+    .sub-label {
+      font-size: 13px;
+      color: var(--blue);
+      font-family: var(--mono);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .num-block { margin-bottom: 20px; }
+
+    /* ── INTEREST BOX ── */
+    .interest-box {
+      background: var(--red-pale);
+      border: 1.5px solid var(--red);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 8px;
+    }
+    .interest-box .int-label {
+      font-size: 13px;
+      color: var(--red);
+      font-family: var(--mono);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .interest-box .int-num {
+      font-size: 32px;
+      color: var(--red);
+      font-weight: 700;
+    }
+    .interest-box .int-sub {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--red);
+      font-family: var(--mono);
+      font-weight: 700;
+    }
+
+    /* ── PAID SO FAR BOX ── */
+    .paid-box {
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: var(--blue-card);
+      border-radius: 8px;
+      border: 1.5px solid var(--blue-border);
+    }
+    .paid-box .paid-meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--blue);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .paid-box .paid-body {
+      font-size: 15px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    /* ── SALARY BOX ── */
+    .salary-box {
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: var(--red-pale);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--blue);
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    /* ── ALT ROWS ── */
+    .alt-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--blue-grid);
+    }
+    .alt-row:last-child { border-bottom: none; }
+    .alt-emoji { font-size: 28px; }
+    .alt-units { font-size: 22px; color: var(--blue); font-weight: 700; }
+    .alt-label { font-size: 12px; color: var(--blue-light); font-family: var(--mono); font-weight: 700; margin-top: 2px; }
+
+    /* ── CHART ── */
+    .chart-wrap { width: 100%; margin: 8px 0 0; position: relative; }
+    canvas#spiralChart { width: 100% !important; height: 220px !important; }
+
+    .chart-legend {
+      display: flex;
+      gap: 20px;
+      margin-top: 14px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: var(--mono);
+      font-weight: 700;
+    }
+    .legend-line {
+      width: 20px;
+      height: 2.5px;
+      border-radius: 2px;
+    }
+
+    /* ── EXIT PATH ── */
+    .exit-steps {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--blue);
+      font-weight: 700;
+    }
+    .exit-step {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--blue-border);
+    }
+    .exit-step:last-child { border-bottom: none; margin-bottom: 0; }
+    .exit-num { color: var(--blue); }
+    .exit-phone { color: var(--red); }
+
+    .exit-footer {
+      margin-top: 24px;
+      padding: 16px;
+      background: rgba(21,101,192,.07);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: var(--mono);
+      color: var(--blue);
+      line-height: 1.7;
+      font-weight: 700;
+    }
+
+    /* ── SCREENS ── */
+    #screen-input  { display: block; }
+    #screen-result { display: none; }
+
+    /* ── PRIVACY NOTE ── */
+    .privacy-note {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 11px;
+      color: var(--blue-light);
+      font-family: var(--mono);
+      font-weight: 700;
+      letter-spacing: .05em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     INPUT SCREEN
+════════════════════════════════════════════════════════ -->
+<div id="screen-input">
+  <div class="header">
+    <div class="logo">Debt Mirror · South Africa</div>
+    <h1>See what your<br>loan is really costing you.</h1>
+    <p>No judgement. Just the truth.</p>
+  </div>
+
+  <div class="body-wrap">
+    <div class="card">
+      <div class="field">
+        <label class="field-label" for="principal">How much did you borrow? *</label>
+        <input type="number" id="principal" placeholder="5000" min="1" />
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="payment">What do you pay back every month? *</label>
+        <input type="number" id="payment" placeholder="900" min="1" />
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="months">Total number of months to repay *</label>
+        <input type="number" id="months" placeholder="18" min="1" />
+      </div>
+
+      <hr class="divider" />
+
+      <div class="field">
+        <label class="field-label" for="monthsPaid">How many months have you already paid? (optional)</label>
+        <input type="number" id="monthsPaid" placeholder="0" min="0" />
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label class="field-label" for="salary">Your monthly salary (optional — for context)</label>
+        <input type="number" id="salary" placeholder="12000" min="0" />
+      </div>
+    </div>
+
+    <div id="error-box" class="error-box"></div>
+
+    <button class="btn-primary" onclick="calculate()">Show Me The Truth →</button>
+
+    <p class="disclaimer">
+      ⚠️ DISCLAIMER: Your information stays on this device.<br>
+      Nothing is stored or shared. This tool is for educational purposes only<br>
+      and does not constitute financial advice.
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     RESULTS SCREEN
+════════════════════════════════════════════════════════ -->
+<div id="screen-result">
+  <div class="header">
+    <div class="logo">Debt Mirror · Your Results</div>
+    <h1>Here is where<br>you actually stand.</h1>
+  </div>
+
+  <div class="body-wrap">
+    <button class="btn-back" onclick="goBack()">← Recalculate</button>
+
+    <!-- SECTION 1: True Cost -->
+    <div class="card">
+      <div class="section-label">What this loan actually costs you</div>
+
+      <div class="num-block">
+        <div class="sub-label">You borrowed</div>
+        <div class="big-num num-blue" id="r-principal">R0</div>
+      </div>
+
+      <div class="num-block">
+        <div class="sub-label">You will pay back</div>
+        <div class="big-num num-red" id="r-total">R0</div>
+      </div>
+
+      <div class="interest-box">
+        <div class="int-label">The lender keeps</div>
+        <div class="int-num" id="r-interest">R0</div>
+        <div class="int-sub" id="r-interest-sub"></div>
+      </div>
+
+      <div class="paid-box" id="r-paid-box" style="display:none">
+        <div class="paid-meta" id="r-paid-meta"></div>
+        <div class="paid-body" id="r-paid-body"></div>
+      </div>
+
+      <div class="salary-box" id="r-salary-box" style="display:none" id="r-salary-label"></div>
+    </div>
+
+    <!-- SECTION 2: Alternatives -->
+    <div class="card">
+      <div class="section-label" id="r-alt-title">What your interest could have been</div>
+      <div style="font-size:14px;color:var(--blue);font-family:var(--mono);font-weight:700;margin-bottom:16px;line-height:1.6">
+        The interest alone — the money that buys you nothing — could have paid for:
+      </div>
+      <div id="r-alternatives"></div>
+    </div>
+
+    <!-- SECTION 3: Spiral Chart -->
+    <div class="card">
+      <div class="section-label">Where you are heading</div>
+      <div style="font-size:14px;color:var(--blue);font-family:var(--mono);font-weight:700;margin-bottom:8px;line-height:1.6">
+        This is what happens when you take a second loan halfway through your first — the pattern most people follow.
+      </div>
+      <div style="font-size:13px;color:var(--red);font-family:var(--mono);font-weight:700;margin-bottom:16px;line-height:1.6">
+        The red line is your future if you borrow again. Most people do.
+      </div>
+      <div class="chart-wrap">
+        <canvas id="spiralChart"></canvas>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item">
+          <div class="legend-line" style="background:var(--blue)"></div>
+          <span style="color:var(--blue)">If you stop here</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background:var(--red)"></div>
+          <span style="color:var(--red)">If you borrow again</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: Exit Path -->
+    <div class="exit-card">
+      <div class="section-label">Your first step out</div>
+      <div style="font-size:22px;line-height:1.4;margin-bottom:16px;color:var(--ink);font-weight:700">
+        You cannot fix this overnight. But you can stop it from getting worse today.
+      </div>
+      <div class="exit-steps">
+        <div class="exit-step">
+          <span class="exit-num">01 —</span> Do not take another loan to pay this one. That is how the spiral starts.
+        </div>
+        <div class="exit-step">
+          <span class="exit-num">02 —</span> Contact the National Credit Regulator (NCR) if your lender is charging more than 5% per month: <span class="exit-phone">0860 627 627</span>
+        </div>
+        <div class="exit-step">
+          <span class="exit-num">03 —</span> Ask your employer's HR department about garnishee order audits. Many are illegal.
+        </div>
+        <div class="exit-step">
+          <span class="exit-num">04 —</span> DebtBusters or National Debt Advisors offer free debt counselling: <span class="exit-phone">0861 663 328</span>
+        </div>
+      </div>
+      <div class="exit-footer">
+        The lender is not your enemy. But this arrangement is designed so that you lose. Now you can see exactly how.
+      </div>
+    </div>
+
+    <!-- DISCLAIMER (Results) -->
+    <div class="disclaimer-box">
+      <p>⚠️ DISCLAIMER: This tool is for educational and awareness purposes only. It does not constitute financial, legal, or credit advice. Always consult a registered financial adviser or debt counsellor before making any financial decisions. Your data is never stored or transmitted.</p>
+    </div>
+
+    <button class="btn-reset" onclick="reset()">Calculate Another Loan</button>
+  </div>
+</div>
+
+<script>
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function fmt(v) {
+  return "R" + Number(v).toLocaleString("en-ZA", { maximumFractionDigits: 0 });
+}
+
+function calcMonthlyRate(principal, payment, months) {
   if (payment * months <= principal) return 0;
   let r = 0.05;
   for (let i = 0; i < 200; i++) {
     const pow = Math.pow(1 + r, months);
-    const f = (principal * r * pow) / (pow - 1) - payment;
-    const df = principal * (pow * (1 + r * months) - pow + 1) / Math.pow(pow - 1, 2);
+    const f   = (principal * r * pow) / (pow - 1) - payment;
+    const df  = principal * (pow * (1 + r * months) - pow + 1) / Math.pow(pow - 1, 2);
     if (!isFinite(f) || !isFinite(df) || df === 0) break;
     const next = r - f / df;
     if (Math.abs(next - r) < 0.000001) { r = next; break; }
     r = Math.max(0.001, next);
   }
   return r;
-};
+}
 
-const buildLoanSchedule = (principal, payment, months) => {
-  const r = calcMonthlyRate(principal, payment, months);
-  let balance = principal;
-  const rows = [];
-  for (let m = 1; m <= months; m++) {
-    const interest = balance * r;
-    const toward = Math.min(payment - interest, balance);
-    balance = Math.max(0, balance - toward);
-    rows.push({
-      month: m,
-      balance: Math.round(balance),
-      interestPaid: Math.round(interest),
-      principalPaid: Math.round(toward),
-    });
-  }
-  return { rows, rate: r };
-};
+function buildSpiralData(principal, payment, months) {
+  const rate = calcMonthlyRate(principal, payment, months);
+  const mid  = Math.floor(months / 2);
+  const data = [];
+  let bal1 = principal, bal2 = 0, spiralStarted = false;
 
-const buildSpiralData = (principal, payment, months, salary) => {
-  const { rows, rate } = buildLoanSchedule(principal, payment, months);
-  const data = rows.map((r, i) => ({
-    month: i + 1,
-    single: principal - (principal - rows[i].balance),
-    balance: rows[i].balance,
-    label: `Month ${i + 1}`,
-  }));
-
-  const mid = Math.floor(months / 2);
-  const spiralData = [];
-  let bal1 = principal;
-  let bal2 = 0;
-  let spiralStarted = false;
-  for (let m = 1; m <= months * 1.8; m++) {
+  for (let m = 1; m <= Math.ceil(months * 1.8); m++) {
     const int1 = bal1 * rate;
     bal1 = Math.max(0, bal1 - (payment - int1));
     if (m === mid) { bal2 = principal; spiralStarted = true; }
@@ -64,638 +582,74 @@ const buildSpiralData = (principal, payment, months, salary) => {
       const int2 = bal2 * rate;
       bal2 = Math.max(0, bal2 - (payment - int2));
     }
-    spiralData.push({
-      month: m,
+    data.push({
+      month:  m,
       single: m <= months ? Math.round(bal1) : null,
       spiral: Math.round(bal1 + bal2),
     });
   }
-  return { schedule: data, spiralData, rate };
-};
-
-const ALTERNATIVES = [
-  { emoji: "🛒", label: "months of groceries for your family", unit: 3200 },
-  { emoji: "📚", label: "years of school fees (govt school)", unit: 800, isYear: true },
-  { emoji: "⚡", label: "months of electricity", unit: 700 },
-  { emoji: "💊", label: "months of chronic medication", unit: 500 },
-  { emoji: "📱", label: "months of data & airtime", unit: 260 },
-];
-
-// ─── Animated Counter ─────────────────────────────────────────────────────────
-
-function AnimatedNumber({ target, duration = 1200, prefix = "R" }) {
-  const [display, setDisplay] = useState(0);
-  const start = useRef(0);
-  const raf = useRef(null);
-
-  useEffect(() => {
-    start.current = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - start.current;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(ease * target));
-      if (progress < 1) raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-  }, [target, duration]);
-
-  return (
-    <span>
-      {prefix}{display.toLocaleString("en-ZA")}
-    </span>
-  );
+  return { data, rate };
 }
 
-// ─── Custom Tooltip ───────────────────────────────────────────────────────────
+// ─── Animated Counter ───────────────────────────────────────────────────────
 
-const ChartTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{
-      background: "#ffffff",
-      border: "1px solid #1565C0",
-      borderRadius: 8,
-      padding: "10px 14px",
-      fontSize: 13,
-      color: "#1a1a2e",
-      fontWeight: 700,
-      boxShadow: "0 2px 12px rgba(21,101,192,0.12)"
-    }}>
-      <div style={{ marginBottom: 4, color: "#1565C0", fontWeight: 700 }}>Month {label}</div>
-      {payload.map((p, i) => (
-        <div key={i} style={{ color: p.color, fontWeight: 700 }}>
-          {p.name}: R{Number(p.value).toLocaleString("en-ZA")}
-        </div>
-      ))}
-    </div>
-  );
-};
+function animateNumber(el, target, duration, prefix) {
+  prefix = prefix !== undefined ? prefix : "R";
+  const start = performance.now();
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const ease     = 1 - Math.pow(1 - progress, 3);
+    const val      = Math.round(ease * target);
+    el.textContent = prefix + val.toLocaleString("en-ZA");
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Canvas Chart ──────────────────────────────────────────────────────────
 
-export default function DebtMirror() {
-  const [step, setStep] = useState("input");
-  const [form, setForm] = useState({
-    principal: "",
-    payment: "",
-    months: "",
-    salary: "",
-    monthsPaid: "",
-  });
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+function drawChart(spiralData) {
+  const canvas = document.getElementById("spiralChart");
+  const dpr    = window.devicePixelRatio || 1;
+  const W      = canvas.parentElement.clientWidth;
+  const H      = 220;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + "px";
+  canvas.style.height = H + "px";
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setError("");
-  };
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
 
-  const handleCalculate = () => {
-    const p = parseFloat(form.principal);
-    const pay = parseFloat(form.payment);
-    const m = parseInt(form.months);
-    const sal = parseFloat(form.salary) || 0;
-    const paid = parseInt(form.monthsPaid) || 0;
+  const PAD = { top: 14, right: 12, bottom: 34, left: 46 };
+  const cW  = W - PAD.left - PAD.right;
+  const cH  = H - PAD.top  - PAD.bottom;
 
-    if (!p || !pay || !m) { setError("Please fill in all required fields."); return; }
-    if (pay * m < p) { setError("Your total repayments seem lower than what you borrowed. Check your numbers."); return; }
-    if (paid >= m) { setError("Months already paid can't exceed total loan term."); return; }
+  // ── find data range ──
+  const allVals = spiralData.flatMap(d => [d.single ?? 0, d.spiral]);
+  const maxY    = Math.max(...allVals) * 1.08;
+  const n       = spiralData.length;
 
-    const totalRepayment = pay * m;
-    const totalInterest = totalRepayment - p;
-    const alreadyPaid = pay * paid;
-    const remaining = pay * (m - paid);
-    const { schedule, spiralData, rate } = buildSpiralData(p, pay, m, sal);
-    const annualRate = (Math.pow(1 + rate, 12) - 1) * 100;
+  function xPos(i)  { return PAD.left + (i / (n - 1)) * cW; }
+  function yPos(v)  { return PAD.top  + cH - (v / maxY) * cH; }
 
-    setResult({
-      principal: p, payment: pay, months: m, salary: sal,
-      monthsPaid: paid, totalRepayment, totalInterest,
-      alreadyPaid, remaining, spiralData, annualRate,
-      percentInterest: (totalInterest / totalRepayment) * 100,
-    });
-    setStep("result");
-  };
-
-  // ── Styles ────────────────────────────────────────────────────────────────
-
-  const S = {
-    root: {
-      minHeight: "100vh",
-      background: "#ffffff",
-      color: "#1a1a2e",
-      fontFamily: "'DM Serif Display', Georgia, serif",
-      padding: "0 0 80px 0",
-    },
-    header: {
-      borderBottom: "2px solid #1565C0",
-      padding: "28px 24px 24px",
-      background: "linear-gradient(180deg, #e3f0ff 0%, #ffffff 100%)",
-    },
-    logo: {
-      fontSize: 11,
-      letterSpacing: "0.3em",
-      color: "#1565C0",
-      textTransform: "uppercase",
-      fontFamily: "'DM Mono', monospace",
-      marginBottom: 8,
-      fontWeight: 700,
-    },
-    title: {
-      fontSize: "clamp(28px, 5vw, 42px)",
-      fontWeight: 700,
-      lineHeight: 1.15,
-      margin: 0,
-      color: "#1565C0",
-    },
-    subtitle: {
-      marginTop: 8,
-      fontSize: 14,
-      color: "#1976D2",
-      fontFamily: "'DM Mono', monospace",
-      letterSpacing: "0.02em",
-      fontWeight: 700,
-    },
-    card: {
-      background: "#f4f8ff",
-      border: "1.5px solid #90CAF9",
-      borderRadius: 12,
-      padding: "28px 24px",
-      marginBottom: 16,
-    },
-    label: {
-      display: "block",
-      fontSize: 11,
-      letterSpacing: "0.2em",
-      color: "#1565C0",
-      textTransform: "uppercase",
-      fontFamily: "'DM Mono', monospace",
-      marginBottom: 8,
-      fontWeight: 700,
-    },
-    input: {
-      width: "100%",
-      background: "#ffffff",
-      border: "1.5px solid #90CAF9",
-      borderRadius: 8,
-      padding: "14px 16px",
-      color: "#1a1a2e",
-      fontSize: 20,
-      fontFamily: "'DM Mono', monospace",
-      outline: "none",
-      boxSizing: "border-box",
-      transition: "border-color 0.2s",
-      fontWeight: 700,
-    },
-    btn: {
-      width: "100%",
-      background: "#1565C0",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: 8,
-      padding: "18px",
-      fontSize: 16,
-      fontFamily: "'DM Serif Display', Georgia, serif",
-      fontWeight: 700,
-      cursor: "pointer",
-      letterSpacing: "0.05em",
-      marginTop: 8,
-      transition: "background 0.2s",
-    },
-    sectionLabel: {
-      fontSize: 10,
-      letterSpacing: "0.3em",
-      color: "#1565C0",
-      textTransform: "uppercase",
-      fontFamily: "'DM Mono', monospace",
-      marginBottom: 12,
-      fontWeight: 700,
-    },
-    bigNumber: {
-      fontSize: "clamp(36px, 8vw, 60px)",
-      fontWeight: 700,
-      lineHeight: 1,
-      letterSpacing: "-0.02em",
-    },
-    redNumber: { color: "#D32F2F", fontWeight: 700 },
-    blueNumber: { color: "#1565C0", fontWeight: 700 },
-    greenNumber: { color: "#2a9d8f", fontWeight: 700 },
-    divider: {
-      border: "none",
-      borderTop: "1.5px solid #90CAF9",
-      margin: "20px 0",
-    },
-    altRow: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      padding: "14px 0",
-      borderBottom: "1px solid #BBDEFB",
-    },
-    backBtn: {
-      background: "transparent",
-      border: "1.5px solid #1565C0",
-      borderRadius: 8,
-      color: "#1565C0",
-      padding: "10px 20px",
-      fontFamily: "'DM Mono', monospace",
-      fontSize: 12,
-      cursor: "pointer",
-      marginBottom: 20,
-      letterSpacing: "0.1em",
-      fontWeight: 700,
-    },
-    exitCard: {
-      background: "linear-gradient(135deg, #e3f2fd 0%, #f4f8ff 100%)",
-      border: "1.5px solid #1565C0",
-      borderRadius: 12,
-      padding: "28px 24px",
-    },
-  };
-
-  // ── Input Screen ──────────────────────────────────────────────────────────
-
-  if (step === "input") return (
-    <>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-      <div style={S.root}>
-        <div style={S.header}>
-          <div style={S.logo}>Debt Mirror · South Africa</div>
-          <h1 style={S.title}>See what your<br />loan is really costing you.</h1>
-          <p style={S.subtitle}>No judgement. Just the truth.</p>
-        </div>
-
-        <div style={{ padding: "24px 16px 0" }}>
-          <div style={S.card}>
-            <div style={{ marginBottom: 24 }}>
-              <label style={S.label}>How much did you borrow? *</label>
-              <input
-                style={S.input}
-                name="principal"
-                type="number"
-                placeholder="R 5 000"
-                value={form.principal}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={S.label}>What do you pay back every month? *</label>
-              <input
-                style={S.input}
-                name="payment"
-                type="number"
-                placeholder="R 900"
-                value={form.payment}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={S.label}>Total number of months to repay *</label>
-              <input
-                style={S.input}
-                name="months"
-                type="number"
-                placeholder="18"
-                value={form.months}
-                onChange={handleChange}
-              />
-            </div>
-
-            <hr style={S.divider} />
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={S.label}>How many months have you already paid? (optional)</label>
-              <input
-                style={S.input}
-                name="monthsPaid"
-                type="number"
-                placeholder="0"
-                value={form.monthsPaid}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div style={{ marginBottom: 8 }}>
-              <label style={S.label}>Your monthly salary (optional — for context)</label>
-              <input
-                style={S.input}
-                name="salary"
-                type="number"
-                placeholder="R 12 000"
-                value={form.salary}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div style={{
-              background: "#fff5f5", border: "1.5px solid #D32F2F",
-              borderRadius: 8, padding: "12px 16px",
-              color: "#D32F2F", fontSize: 13,
-              fontFamily: "'DM Mono', monospace",
-              marginBottom: 16,
-              fontWeight: 700,
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button style={S.btn} onClick={handleCalculate}>
-            Show Me The Truth →
-          </button>
-
-          {/* ── DISCLAIMER ── */}
-          <p style={{
-            textAlign: "center", marginTop: 16,
-            fontSize: 12,
-            color: "#D32F2F",
-            fontFamily: "'DM Mono', monospace",
-            letterSpacing: "0.05em",
-            fontWeight: 700,
-            lineHeight: 1.6,
-          }}>
-            ⚠️ DISCLAIMER: Your information stays on this device. Nothing is stored or shared. This tool is for educational purposes only and does not constitute financial advice.
-          </p>
-        </div>
-      </div>
-    </>
-  );
-
-  // ── Results Screen ────────────────────────────────────────────────────────
-
-  if (step === "result" && result) {
-    const { principal, payment, months, salary, monthsPaid,
-      totalRepayment, totalInterest, remaining,
-      spiralData, annualRate, percentInterest } = result;
-
-    const interestRatio = totalInterest / principal;
-
-    return (
-      <>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-        <div style={S.root}>
-          <div style={S.header}>
-            <div style={S.logo}>Debt Mirror · Your Results</div>
-            <h1 style={S.title}>Here is where<br />you actually stand.</h1>
-          </div>
-
-          <div style={{ padding: "24px 16px 0" }}>
-            <button style={S.backBtn} onClick={() => setStep("input")}>
-              ← Recalculate
-            </button>
-
-            {/* ── SECTION 1: The True Cost ── */}
-            <div style={S.card}>
-              <div style={S.sectionLabel}>What this loan actually costs you</div>
-
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, color: "#1565C0", fontFamily: "'DM Mono', monospace", marginBottom: 4, fontWeight: 700 }}>
-                  You borrowed
-                </div>
-                <div style={{ ...S.bigNumber, ...S.blueNumber }}>
-                  <AnimatedNumber target={principal} />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, color: "#1565C0", fontFamily: "'DM Mono', monospace", marginBottom: 4, fontWeight: 700 }}>
-                  You will pay back
-                </div>
-                <div style={{ ...S.bigNumber, ...S.redNumber }}>
-                  <AnimatedNumber target={totalRepayment} duration={1600} />
-                </div>
-              </div>
-
-              <div style={{
-                background: "#fff5f5",
-                border: "1.5px solid #D32F2F",
-                borderRadius: 8,
-                padding: "16px",
-                marginTop: 8
-              }}>
-                <div style={{ fontSize: 13, color: "#D32F2F", fontFamily: "'DM Mono', monospace", marginBottom: 6, fontWeight: 700 }}>
-                  The lender keeps
-                </div>
-                <div style={{ fontSize: 32, color: "#D32F2F", fontWeight: 700 }}>
-                  <AnimatedNumber target={totalInterest} duration={2000} />
-                </div>
-                <div style={{ marginTop: 8, fontSize: 13, color: "#D32F2F", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
-                  That is {Math.round(percentInterest)}% of everything you pay.
-                  {annualRate > 0 && ` Effective rate: ${annualRate.toFixed(0)}% per year.`}
-                </div>
-              </div>
-
-              {monthsPaid > 0 && (
-                <div style={{
-                  marginTop: 16,
-                  padding: "14px 16px",
-                  background: "#f4f8ff",
-                  borderRadius: 8,
-                  border: "1.5px solid #90CAF9"
-                }}>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#1565C0", marginBottom: 6, fontWeight: 700 }}>
-                    After {monthsPaid} months of paying {fmt(payment)}/month
-                  </div>
-                  <div style={{ fontSize: 15, color: "#1a1a2e", fontWeight: 700 }}>
-                    You've paid <span style={{ color: "#1565C0" }}>{fmt(payment * monthsPaid)}</span> total.
-                    You still owe <span style={{ color: "#D32F2F" }}>{fmt(remaining)}</span>.
-                  </div>
-                </div>
-              )}
-
-              {salary > 0 && (
-                <div style={{
-                  marginTop: 16,
-                  padding: "14px 16px",
-                  background: "#fff5f5",
-                  borderRadius: 8,
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: 13,
-                  color: "#1565C0",
-                  lineHeight: 1.6,
-                  fontWeight: 700,
-                }}>
-                  This loan costs you{" "}
-                  <span style={{ color: "#D32F2F" }}>
-                    {Math.round((payment / salary) * 100)}% of your salary
-                  </span>{" "}
-                  every single month for {months - monthsPaid} more months.
-                </div>
-              )}
-            </div>
-
-            {/* ── SECTION 2: What It Could Have Been ── */}
-            <div style={S.card}>
-              <div style={S.sectionLabel}>What {fmt(totalInterest)} could have been</div>
-              <div style={{ fontSize: 14, color: "#1565C0", fontFamily: "'DM Mono', monospace", marginBottom: 16, lineHeight: 1.6, fontWeight: 700 }}>
-                The interest alone — the money that buys you nothing — could have paid for:
-              </div>
-
-              {ALTERNATIVES.map((alt, i) => {
-                const units = alt.isYear
-                  ? (totalInterest / (alt.unit * 12)).toFixed(1)
-                  : Math.floor(totalInterest / alt.unit);
-                return (
-                  <div key={i} style={S.altRow}>
-                    <span style={{ fontSize: 28 }}>{alt.emoji}</span>
-                    <div>
-                      <div style={{ fontSize: 22, color: "#1565C0", fontWeight: 700 }}>
-                        {units} {alt.isYear ? "years" : "months"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#1976D2", fontFamily: "'DM Mono', monospace", marginTop: 2, fontWeight: 700 }}>
-                        of {alt.label}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── SECTION 3: The Spiral ── */}
-            <div style={S.card}>
-              <div style={S.sectionLabel}>Where you are heading</div>
-              <div style={{ fontSize: 14, color: "#1565C0", fontFamily: "'DM Mono', monospace", marginBottom: 8, lineHeight: 1.6, fontWeight: 700 }}>
-                This is what happens when you take a second loan halfway through your first — the pattern most people follow.
-              </div>
-
-              <div style={{ fontSize: 13, color: "#D32F2F", fontFamily: "'DM Mono', monospace", marginBottom: 20, lineHeight: 1.6, fontWeight: 700 }}>
-                The red line is your future if you borrow again. Most people do.
-              </div>
-
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={spiralData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="singleGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#1565C0" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#1565C0" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="spiralGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#D32F2F" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#D32F2F" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="#BBDEFB" strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="month"
-                    stroke="#90CAF9"
-                    tick={{ fill: "#1565C0", fontSize: 10, fontFamily: "DM Mono", fontWeight: 700 }}
-                    label={{ value: "Month", position: "insideBottom", offset: -2, fill: "#1565C0", fontSize: 10 }}
-                  />
-                  <YAxis
-                    stroke="#90CAF9"
-                    tick={{ fill: "#1565C0", fontSize: 10, fontFamily: "DM Mono", fontWeight: 700 }}
-                    tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="single"
-                    stroke="#1565C0"
-                    strokeWidth={2.5}
-                    fill="url(#singleGrad)"
-                    name="Debt (one loan)"
-                    connectNulls={false}
-                    dot={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="spiral"
-                    stroke="#D32F2F"
-                    strokeWidth={2.5}
-                    fill="url(#spiralGrad)"
-                    name="Debt (spiral)"
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-
-              <div style={{ display: "flex", gap: 20, marginTop: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#1565C0", fontWeight: 700 }}>
-                  <div style={{ width: 20, height: 2, background: "#1565C0" }} />
-                  If you stop here
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "'DM Mono', monospace", color: "#D32F2F", fontWeight: 700 }}>
-                  <div style={{ width: 20, height: 2, background: "#D32F2F" }} />
-                  If you borrow again
-                </div>
-              </div>
-            </div>
-
-            {/* ── SECTION 4: Exit Path ── */}
-            <div style={S.exitCard}>
-              <div style={{ ...S.sectionLabel, color: "#1565C0" }}>Your first step out</div>
-              <div style={{ fontSize: 22, lineHeight: 1.4, marginBottom: 16, color: "#1a1a2e", fontWeight: 700 }}>
-                You cannot fix this overnight. But you can stop it from getting worse today.
-              </div>
-
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, lineHeight: 1.8, color: "#1565C0", fontWeight: 700 }}>
-                <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #90CAF9" }}>
-                  <span style={{ color: "#1565C0" }}>01 —</span> Do not take another loan to pay this one. That is how the spiral starts.
-                </div>
-                <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #90CAF9" }}>
-                  <span style={{ color: "#1565C0" }}>02 —</span> Contact the National Credit Regulator (NCR) if your lender is charging more than 5% per month: <span style={{ color: "#D32F2F" }}>0860 627 627</span>
-                </div>
-                <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #90CAF9" }}>
-                  <span style={{ color: "#1565C0" }}>03 —</span> Ask your employer's HR department about garnishee order audits. Many are illegal.
-                </div>
-                <div>
-                  <span style={{ color: "#1565C0" }}>04 —</span> DebtBusters or National Debt Advisors offer free debt counselling: <span style={{ color: "#D32F2F" }}>0861 663 328</span>
-                </div>
-              </div>
-
-              <div style={{
-                marginTop: 24,
-                padding: "16px",
-                background: "rgba(21, 101, 192, 0.07)",
-                borderRadius: 8,
-                fontSize: 13,
-                fontFamily: "'DM Mono', monospace",
-                color: "#1565C0",
-                lineHeight: 1.7,
-                fontWeight: 700,
-              }}>
-                The lender is not your enemy. But this arrangement is designed so that you lose. Now you can see exactly how.
-              </div>
-            </div>
-
-            {/* ── DISCLAIMER (Results Page) ── */}
-            <div style={{
-              marginTop: 24,
-              padding: "14px 16px",
-              background: "#fff5f5",
-              border: "2px solid #D32F2F",
-              borderRadius: 8,
-              textAlign: "center",
-            }}>
-              <p style={{
-                margin: 0,
-                fontSize: 12,
-                color: "#D32F2F",
-                fontFamily: "'DM Mono', monospace",
-                fontWeight: 700,
-                letterSpacing: "0.04em",
-                lineHeight: 1.7,
-              }}>
-                ⚠️ DISCLAIMER: This tool is for educational and awareness purposes only. It does not constitute financial, legal, or credit advice. Always consult a registered financial adviser or debt counsellor before making any financial decisions. Your data is never stored or transmitted.
-              </p>
-            </div>
-
-            <button
-              style={{ ...S.btn, marginTop: 24 }}
-              onClick={() => { setStep("input"); setForm({ principal: "", payment: "", months: "", salary: "", monthsPaid: "" }); setResult(null); }}
-            >
-              Calculate Another Loan
-            </button>
-          </div>
-        </div>
-      </>
-    );
+  // ── grid lines ──
+  ctx.strokeStyle = "#BBDEFB";
+  ctx.lineWidth   = 1;
+  const gridCount = 4;
+  for (let g = 0; g <= gridCount; g++) {
+    const y = PAD.top + (g / gridCount) * cH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    // y-axis labels
+    const val = maxY * (1 - g / gridCount);
+    ctx.fillStyle    = "#1565C0";
+    ctx.font         = "bold 10px 'DM Mono', monospace";
+    ctx.textAlign    = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText("R" + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val.toFixed(0)), PAD.left - 4, y);
   }
 
-  return null;
-}
+  // x-axis ticks
+  const xTickCount = Math.min(6, n - 1);
+  ctx.fillStyle    = "#1565C0";
+  ctx.font         = "bold 10px 'DM Mono', monospa
