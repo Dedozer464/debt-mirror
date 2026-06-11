@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -381,7 +382,7 @@ header{
 </div>
 
 <script>
-// ── NCR CAPS ──────────────────────────────────────────────────────────────────
+// ── NCR CAPS ────────────────────────────────────────────────────────────────
 const NCR_CAPS = {
   mortgage:      {label:'Mortgage Agreement',         addOn:21.0,  flat:null},
   unsecured:     {label:'Unsecured Credit',           addOn:21.0,  flat:null},
@@ -391,7 +392,7 @@ const NCR_CAPS = {
   other:         {label:'Other Credit Agreement',     addOn:17.0,  flat:null},
 };
 
-// ── NEWTON-RAPHSON IRR ────────────────────────────────────────────────────────
+// ── NEWTON-RAPHSON IRR ───────────────────────────────────────────────────────
 function solveIRR(principal, monthlyPayment, months) {
   if (monthlyPayment<=0||months<=0||principal<=0) return null;
   let r=0.01;
@@ -406,7 +407,7 @@ function solveIRR(principal, monthlyPayment, months) {
   return r*12*100;
 }
 
-// ── AMORTISATION ──────────────────────────────────────────────────────────────
+// ── AMORTISATION ─────────────────────────────────────────────────────────────
 function buildSchedule(principal, monthlyRate, months, pmt) {
   const s=[]; let bal=principal, cumInt=0;
   for (let m=1;m<=months;m++) {
@@ -419,7 +420,7 @@ function buildSchedule(principal, monthlyRate, months, pmt) {
   return s;
 }
 
-// ── FORMATTERS ────────────────────────────────────────────────────────────────
+// ── FORMATTERS ───────────────────────────────────────────────────────────────
 const fmt    = n => 'R\u00a0'+Number(n).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtPct = n => Number(n).toFixed(2)+'%';
 
@@ -429,4 +430,207 @@ function switchTab(id, btn) {
     const el = document.getElementById('tab-'+t);
     if (el) el.style.display = t===id ? '' : 'none';
   });
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('act
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── MAIN CALCULATION ──────────────────────────────────────────────────────────
+function calc() {
+  const principal = +document.getElementById('principal').value;
+  const statedAPR = +document.getElementById('statedAPR').value;
+  const months = +document.getElementById('months').value;
+  const initFee = +document.getElementById('initFee').value;
+  const monthlyFee = +document.getElementById('monthlyFee').value;
+  const insurance = +document.getElementById('insurance').value;
+  const loanType = document.getElementById('loanType').value;
+  const repoRate = +document.getElementById('repoRate').value;
+
+  const cap = NCR_CAPS[loanType];
+  const ncrMax = cap.flat !== null ? cap.flat : repoRate + cap.addOn;
+  
+  const monthlyRate = statedAPR / 100 / 12;
+  const pmt = (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+  const totalMonthly = pmt + monthlyFee + insurance;
+  const totalPaid = totalMonthly * months + initFee;
+  const totalInterest = totalPaid - principal - initFee;
+  
+  const effAPR = solveIRR(principal, totalMonthly, months);
+  const itp = ((totalInterest / principal) * 100).toFixed(2);
+  const delta = (effAPR - statedAPR).toFixed(2);
+  
+  const isViolated = effAPR > ncrMax;
+  
+  // Update displays
+  document.getElementById('val-monthly').textContent = fmt(totalMonthly);
+  document.getElementById('val-eff').textContent = fmtPct(effAPR);
+  document.getElementById('val-total').textContent = fmt(totalPaid);
+  document.getElementById('val-interest').textContent = fmt(totalInterest);
+  document.getElementById('m-itp').textContent = itp + '%';
+  document.getElementById('m-base').textContent = fmt(pmt);
+  document.getElementById('m-fees').textContent = fmt(initFee + monthlyFee * months + insurance * months);
+  document.getElementById('m-delta').textContent = (delta > 0 ? '+' : '') + delta + '%';
+  document.getElementById('m-cap').textContent = fmtPct(ncrMax);
+  document.getElementById('m-comp').textContent = isViolated ? 'VIOLATED' : 'COMPLIANT';
+  document.getElementById('m-comp').style.color = isViolated ? '#ef4444' : '#22c55e';
+  
+  document.getElementById('hdr-repo').textContent = fmtPct(repoRate);
+  const verdictEl = document.getElementById('hdr-verdict');
+  if (isViolated) {
+    verdictEl.textContent = '✗ VIOLATED';
+    verdictEl.className = 'vbadge vbadge-danger';
+  } else {
+    verdictEl.textContent = '✓ COMPLIANT';
+    verdictEl.className = 'vbadge vbadge-safe';
+  }
+  
+  document.getElementById('ncr-cap-label').textContent = fmtPct(ncrMax);
+  document.getElementById('ncr-eff-label').textContent = 'Effective: ' + fmtPct(effAPR);
+  const fillWidth = Math.min(100, (effAPR / ncrMax) * 100);
+  document.getElementById('ncr-bar-fill').style.width = fillWidth + '%';
+  document.getElementById('ncr-bar-fill').style.background = isViolated 
+    ? 'linear-gradient(90deg,#ef4444,#ef4444)' 
+    : 'linear-gradient(90deg,#22c55e,#22c55e)';
+  
+  const violation = document.getElementById('violation-banner');
+  if (isViolated) {
+    violation.style.display = 'flex';
+    document.getElementById('violation-text').textContent = `Effective APR of ${fmtPct(effAPR)} exceeds NCR cap of ${fmtPct(ncrMax)}`;
+  } else {
+    violation.style.display = 'none';
+  }
+  
+  // Build schedule
+  const schedule = buildSchedule(principal, monthlyRate, months, pmt);
+  const tbody = document.getElementById('sched-body');
+  tbody.innerHTML = '';
+  schedule.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.month}</td><td>${fmt(totalMonthly)}</td><td>${fmt(row.prin)}</td><td>${fmt(row.int)}</td><td>${fmt(row.bal)}`;
+    tbody.appendChild(tr);
+  });
+  
+  // Pie chart
+  const totalCost = principal + totalInterest + (initFee + monthlyFee * months + insurance * months);
+  const prinPct = (principal / totalCost) * 100;
+  const intPct = (totalInterest / totalCost) * 100;
+  const feePct = ((initFee + monthlyFee * months + insurance * months) / totalCost) * 100;
+  
+  const svg = document.getElementById('pie-chart');
+  svg.innerHTML = '';
+  let angle = 0;
+  const parts = [
+    {pct: prinPct, color: '#3b82f6', label: 'Principal'},
+    {pct: intPct, color: '#ef4444', label: 'Interest'},
+    {pct: feePct, color: '#f59e0b', label: 'Fees'}
+  ];
+  
+  parts.forEach(part => {
+    const sliceAngle = (part.pct / 100) * 360;
+    const startAngle = angle * Math.PI / 180;
+    const endAngle = (angle + sliceAngle) * Math.PI / 180;
+    const r = 80;
+    const cx = 110, cy = 110;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const largeArc = sliceAngle > 180 ? 1 : 0;
+    const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', pathData);
+    path.setAttribute('fill', part.color);
+    path.setAttribute('stroke', '#0a0a0c');
+    path.setAttribute('stroke-width', '2');
+    svg.appendChild(path);
+    angle += sliceAngle;
+  });
+  
+  const pieLegend = document.getElementById('pie-legend');
+  pieLegend.innerHTML = '';
+  parts.forEach(part => {
+    const div = document.createElement('div');
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+    div.style.gap = '6px';
+    div.style.fontSize = '11px';
+    div.style.color = '#94a3b8';
+    div.innerHTML = `<div style="width:8px;height:8px;border-radius:2px;background:${part.color}"></div>${part.label}: ${part.pct.toFixed(1)}%`;
+    pieLegend.appendChild(div);
+  });
+  
+  // Breakdown bars
+  const bkBars = document.getElementById('bk-bars');
+  bkBars.innerHTML = `
+    <div class="bk-row">
+      <div class="bk-header"><span class="bk-lbl">Principal</span><span class="bk-val">${fmt(principal)}</span></div>
+      <div class="bk-track"><div class="bk-fill" style="width:${prinPct}%;background:#3b82f6"></div></div>
+    </div>
+    <div class="bk-row">
+      <div class="bk-header"><span class="bk-lbl">Interest</span><span class="bk-val">${fmt(totalInterest)}</span></div>
+      <div class="bk-track"><div class="bk-fill" style="width:${intPct}%;background:#ef4444"></div></div>
+    </div>
+    <div class="bk-row">
+      <div class="bk-header"><span class="bk-lbl">Fees</span><span class="bk-val">${fmt(initFee + monthlyFee * months + insurance * months)}</span></div>
+      <div class="bk-track"><div class="bk-fill" style="width:${feePct}%;background:#f59e0b"></div></div>
+    </div>
+    <div class="bk-total">
+      <span class="bk-lbl">TOTAL COST</span>
+      <span class="bk-val">${fmt(totalCost)}</span>
+    </div>
+  `;
+}
+
+// ── AI COMPLIANCE ANALYSIS (stub) ──────────────────────────────────────────────
+function runAI() {
+  const aiContent = document.getElementById('ai-content');
+  aiContent.innerHTML = '<div class="ai-loading"><div class="spinner running">◈</div><div style="color:#94a3b8">Analyzing compliance...</div></div>';
+  
+  setTimeout(() => {
+    const principal = +document.getElementById('principal').value;
+    const statedAPR = +document.getElementById('statedAPR').value;
+    const effAPR = parseFloat(document.getElementById('val-eff').textContent);
+    const loanType = document.getElementById('loanType').value;
+    const ncrMax = parseFloat(document.getElementById('m-cap').textContent);
+    
+    const isViolated = effAPR > ncrMax;
+    
+    aiContent.innerHTML = `
+      <div class="ai-summary">
+        Loan compliance analysis for a ${NCR_CAPS[loanType].label} of ${fmt(principal)} over ${document.getElementById('months').value} months.
+      </div>
+      <div class="ai-verdict-row">
+        <span class="vbadge ${isViolated ? 'vbadge-danger' : 'vbadge-safe'}">${isViolated ? '✗ VIOLATED' : '✓ COMPLIANT'}</span>
+        <div class="hcs-box">
+          <span class="hcs-label">Effective vs Stated</span>
+          <span class="hcs-val" style="color:${isViolated ? '#ef4444' : '#22c55e'}">${(effAPR - statedAPR).toFixed(2)}%</span>
+        </div>
+      </div>
+      <div class="ai-cols">
+        <div class="ai-col flags">
+          <div class="ai-col-title">⚠ RED FLAGS</div>
+          ${isViolated ? '<div class="ai-item"><span class="bullet-flag">●</span>Effective rate exceeds NCR cap by ' + (effAPR - ncrMax).toFixed(2) + '%</div>' : '<div class="ai-item"><span class="bullet-flag">•</span>No compliance violations detected</div>'}
+        </div>
+        <div class="ai-col advice">
+          <div class="ai-col-title">✓ RECOMMENDATIONS</div>
+          <div class="ai-item"><span class="bullet-adv">→</span>Review monthly fees and insurance charges</div>
+          <div class="ai-item"><span class="bullet-adv">→</span>Consider loan restructuring if rate exceeds cap</div>
+        </div>
+      </div>
+      <div class="ai-footer">
+        This analysis is generated based on NCR Act s.100–106 guidelines. Always consult legal counsel for compliance matters.
+      </div>
+    `;
+  }, 1500);
+}
+
+// ── EVENT LISTENERS ────────────────────────────────────────────────────────────
+['principal','statedAPR','months','initFee','monthlyFee','insurance','loanType','repoRate'].forEach(id => {
+  document.getElementById(id).addEventListener('change', calc);
+  document.getElementById(id).addEventListener('input', calc);
+});
+
+// Initial calculation
+calc();
+</script>
+</body>
+</html>
